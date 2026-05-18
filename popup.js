@@ -1,5 +1,13 @@
 const { jsPDF } = window.jspdf;
 
+// Currency map: code -> symbol
+const CURRENCIES = {
+  USD: '$', EUR: '€', GBP: '£', MYR: 'RM ', SGD: 'S$',
+  AUD: 'A$', CAD: 'C$', JPY: '¥', INR: '₹', IDR: 'Rp ',
+};
+
+const getSym = () => CURRENCIES[currencyEl.value] || '$';
+
 // Elements
 const fromName     = document.getElementById('from-name');
 const fromEmail    = document.getElementById('from-email');
@@ -11,6 +19,7 @@ const invoiceNum   = document.getElementById('invoice-number');
 const invoiceDate  = document.getElementById('invoice-date');
 const dueDate      = document.getElementById('due-date');
 const taxRateEl    = document.getElementById('tax-rate');
+const currencyEl   = document.getElementById('currency');
 const notesEl      = document.getElementById('notes');
 const itemsCont    = document.getElementById('items-container');
 const subtotalEl   = document.getElementById('subtotal');
@@ -25,8 +34,8 @@ const due = new Date(today);
 due.setDate(due.getDate() + 30);
 dueDate.value = due.toISOString().split('T')[0];
 
-// Load saved business info & last invoice number
-chrome.storage.local.get(['fromName', 'fromEmail', 'fromAddress', 'lastInvoiceNum'], (data) => {
+// Load saved business info, last invoice number, and currency
+chrome.storage.local.get(['fromName', 'fromEmail', 'fromAddress', 'lastInvoiceNum', 'currency'], (data) => {
   if (data.fromName)    fromName.value    = data.fromName;
   if (data.fromEmail)   fromEmail.value   = data.fromEmail;
   if (data.fromAddress) fromAddress.value = data.fromAddress;
@@ -34,6 +43,9 @@ chrome.storage.local.get(['fromName', 'fromEmail', 'fromAddress', 'lastInvoiceNu
     const next = parseInt(data.lastInvoiceNum, 10) + 1;
     invoiceNum.value = `INV-${String(next).padStart(3, '0')}`;
   }
+  if (data.currency) currencyEl.value = data.currency;
+  updateRateHeader();
+  recalculate();
 });
 
 // Auto-save business info
@@ -47,6 +59,17 @@ chrome.storage.local.get(['fromName', 'fromEmail', 'fromAddress', 'lastInvoiceNu
   });
 });
 
+// Currency change
+function updateRateHeader() {
+  document.getElementById('rate-header').textContent = `Rate (${getSym().trim()})`;
+}
+
+currencyEl.addEventListener('change', () => {
+  chrome.storage.local.set({ currency: currencyEl.value });
+  updateRateHeader();
+  recalculate();
+});
+
 // Item management
 function addItem(desc = '', qty = 1, rate = '') {
   const row = document.createElement('div');
@@ -55,7 +78,7 @@ function addItem(desc = '', qty = 1, rate = '') {
     <input type="text" class="item-desc" placeholder="Description" value="${desc}">
     <input type="number" class="item-qty" value="${qty}" min="1" step="1">
     <input type="number" class="item-rate" placeholder="0.00" value="${rate}" min="0" step="0.01">
-    <span class="item-amount">$0.00</span>
+    <span class="item-amount">${getSym()}0.00</span>
     <button class="remove-item" title="Remove">×</button>
   `;
   row.querySelector('.remove-item').addEventListener('click', () => {
@@ -78,16 +101,16 @@ function recalculate() {
     const qty    = parseFloat(row.querySelector('.item-qty').value)  || 0;
     const rate   = parseFloat(row.querySelector('.item-rate').value) || 0;
     const amount = qty * rate;
-    row.querySelector('.item-amount').textContent = `$${amount.toFixed(2)}`;
+    row.querySelector('.item-amount').textContent = `${getSym()}${amount.toFixed(2)}`;
     subtotal += amount;
   });
   const taxPct = parseFloat(taxRateEl.value) || 0;
   const tax    = subtotal * taxPct / 100;
   const total  = subtotal + tax;
-  subtotalEl.textContent  = `$${subtotal.toFixed(2)}`;
-  taxAmountEl.textContent = `$${tax.toFixed(2)}`;
+  subtotalEl.textContent  = `${getSym()}${subtotal.toFixed(2)}`;
+  taxAmountEl.textContent = `${getSym()}${tax.toFixed(2)}`;
   taxLabelEl.textContent  = `Tax (${taxPct}%)`;
-  totalEl.textContent     = `$${total.toFixed(2)}`;
+  totalEl.textContent     = `${getSym()}${total.toFixed(2)}`;
 }
 
 taxRateEl.addEventListener('input', recalculate);
@@ -103,6 +126,7 @@ document.getElementById('clear-btn').addEventListener('click', () => {
 
 // Generate PDF
 document.getElementById('generate-pdf').addEventListener('click', () => {
+  const sym     = getSym();
   const doc     = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageW   = doc.internal.pageSize.getWidth();
   const margin  = 18;
@@ -191,9 +215,9 @@ document.getElementById('generate-pdf').addEventListener('click', () => {
     doc.setFontSize(9);
     const descLines = doc.splitTextToSize(desc, cW * 0.55);
     doc.text(descLines[0], margin + 3, y + 5.5);
-    doc.text(String(qty),                    margin + cW * 0.62,  y + 5.5, { align: 'center' });
-    doc.text(`$${rate.toFixed(2)}`,          margin + cW * 0.78,  y + 5.5, { align: 'center' });
-    doc.text(`$${amount.toFixed(2)}`,        margin + cW,          y + 5.5, { align: 'right' });
+    doc.text(String(qty),                          margin + cW * 0.62,  y + 5.5, { align: 'center' });
+    doc.text(`${sym}${rate.toFixed(2)}`,           margin + cW * 0.78,  y + 5.5, { align: 'center' });
+    doc.text(`${sym}${amount.toFixed(2)}`,         margin + cW,          y + 5.5, { align: 'right' });
     y += 8;
   });
 
@@ -210,14 +234,14 @@ document.getElementById('generate-pdf').addEventListener('click', () => {
   doc.setTextColor(...gray);
   doc.text('Subtotal:', tX, y);
   doc.setTextColor(...dark);
-  doc.text(`$${subtotal.toFixed(2)}`, margin + cW, y, { align: 'right' });
+  doc.text(`${sym}${subtotal.toFixed(2)}`, margin + cW, y, { align: 'right' });
   y += 7;
 
   if (taxPct > 0) {
     doc.setTextColor(...gray);
     doc.text(`Tax (${taxPct}%):`, tX, y);
     doc.setTextColor(...dark);
-    doc.text(`$${tax.toFixed(2)}`, margin + cW, y, { align: 'right' });
+    doc.text(`${sym}${tax.toFixed(2)}`, margin + cW, y, { align: 'right' });
     y += 7;
   }
 
@@ -228,7 +252,7 @@ document.getElementById('generate-pdf').addEventListener('click', () => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text('TOTAL', tX + 2, y + 6.5);
-  doc.text(`$${total.toFixed(2)}`, margin + cW - 2, y + 6.5, { align: 'right' });
+  doc.text(`${sym}${total.toFixed(2)}`, margin + cW - 2, y + 6.5, { align: 'right' });
   y += 18;
 
   // Notes

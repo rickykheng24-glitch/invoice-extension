@@ -30,7 +30,7 @@
     </div>
 
     <!-- Invoice Meta -->
-    <div class="three-col section">
+    <div class="four-col section">
       <div class="field">
         <label>Invoice #</label>
         <input type="text" id="invoice-number" value="INV-001">
@@ -43,6 +43,21 @@
         <label>Due Date</label>
         <input type="date" id="due-date">
       </div>
+      <div class="field">
+        <label>Currency</label>
+        <select id="currency">
+          <option value="USD">$ USD</option>
+          <option value="EUR">€ EUR</option>
+          <option value="GBP">£ GBP</option>
+          <option value="MYR">RM MYR</option>
+          <option value="SGD">S$ SGD</option>
+          <option value="AUD">A$ AUD</option>
+          <option value="CAD">C$ CAD</option>
+          <option value="JPY">¥ JPY</option>
+          <option value="INR">₹ INR</option>
+          <option value="IDR">Rp IDR</option>
+        </select>
+      </div>
     </div>
 
     <!-- Items -->
@@ -51,7 +66,7 @@
       <div class="items-header">
         <span class="col-desc">Description</span>
         <span class="col-qty">Qty</span>
-        <span class="col-rate">Rate ($)</span>
+        <span class="col-rate" id="rate-header">Rate</span>
         <span class="col-amount">Amount</span>
         <span class="col-del"></span>
       </div>
