@@ -332,6 +332,59 @@ textarea {
   font-size: 15px;
 }
 
+/* Signature */
+.sig-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.sig-title-row .section-title {
+  margin-bottom: 0;
+}
+
+.btn-sig-clear {
+  background: none;
+  border: 1px solid #e0e0e0;
+  color: #888;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-sig-clear:hover {
+  border-color: #ff3d3d;
+  color: #ff3d3d;
+}
+
+.sig-wrap {
+  position: relative;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fafafa;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+#sig-canvas {
+  display: block;
+  width: 100%;
+  touch-action: none;
+}
+
+#sig-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ccc;
+  font-size: 13px;
+  pointer-events: none;
+}
+
 /* Actions */
 .actions {
   display: flex;

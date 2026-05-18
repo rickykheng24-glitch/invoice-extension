@@ -160,6 +160,45 @@ function recalculate() {
 
 taxRateEl.addEventListener('input', recalculate);
 
+// Signature canvas
+const sigCanvas = document.getElementById('sig-canvas');
+const sigCtx    = sigCanvas.getContext('2d');
+const sigPlaceholder = document.getElementById('sig-placeholder');
+let sigDrawing = false;
+let hasSig = false;
+
+// Match canvas resolution to display size
+sigCanvas.width  = sigCanvas.offsetWidth  || 424;
+sigCanvas.height = 80;
+
+function sigStyle() {
+  sigCtx.strokeStyle = '#1e1e2e';
+  sigCtx.lineWidth   = 2;
+  sigCtx.lineCap     = 'round';
+  sigCtx.lineJoin    = 'round';
+}
+
+function sigPos(e) {
+  const r = sigCanvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return { x: src.clientX - r.left, y: src.clientY - r.top };
+}
+
+sigCanvas.addEventListener('mousedown',  (e) => { sigDrawing = true; sigStyle(); sigCtx.beginPath(); const p = sigPos(e); sigCtx.moveTo(p.x, p.y); });
+sigCanvas.addEventListener('mousemove',  (e) => { if (!sigDrawing) return; const p = sigPos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); hasSig = true; sigPlaceholder.style.display = 'none'; });
+sigCanvas.addEventListener('mouseup',    () => { sigDrawing = false; });
+sigCanvas.addEventListener('mouseleave', () => { sigDrawing = false; });
+
+sigCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); sigDrawing = true; sigStyle(); sigCtx.beginPath(); const p = sigPos(e); sigCtx.moveTo(p.x, p.y); }, { passive: false });
+sigCanvas.addEventListener('touchmove',  (e) => { e.preventDefault(); if (!sigDrawing) return; const p = sigPos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); hasSig = true; sigPlaceholder.style.display = 'none'; }, { passive: false });
+sigCanvas.addEventListener('touchend',   () => { sigDrawing = false; });
+
+document.getElementById('sig-clear').addEventListener('click', () => {
+  sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+  hasSig = false;
+  sigPlaceholder.style.display = 'block';
+});
+
 // Clear form
 document.getElementById('clear-btn').addEventListener('click', () => {
   toName.value = toEmail.value = toAddress.value = notesEl.value = '';
@@ -340,6 +379,24 @@ document.getElementById('generate-pdf').addEventListener('click', () => {
     const lines = doc.splitTextToSize(notesEl.value.trim(), cW);
     doc.text(lines, margin, y);
     y += lines.length * 5 + 4;
+  }
+
+  // Signature
+  if (hasSig) {
+    const sigImgData = sigCanvas.toDataURL('image/png');
+    const sigW = 70, sigH = 20;
+    const sigX = margin + cW - sigW;
+    doc.addImage(sigImgData, 'PNG', sigX, y, sigW, sigH);
+    y += sigH + 1;
+    doc.setDrawColor(...gray);
+    doc.setLineWidth(0.4);
+    doc.line(sigX, y, sigX + sigW, y);
+    y += 4;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...gray);
+    doc.text('Authorized Signature', sigX + sigW / 2, y, { align: 'center' });
+    y += 10;
   }
 
   // Footer
