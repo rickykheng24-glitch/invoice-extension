@@ -21,6 +21,13 @@ const dueDate      = document.getElementById('due-date');
 const taxRateEl    = document.getElementById('tax-rate');
 const currencyEl   = document.getElementById('currency');
 const notesEl      = document.getElementById('notes');
+const logoArea     = document.getElementById('logo-area');
+const logoPreview  = document.getElementById('logo-preview');
+const logoInput    = document.getElementById('logo-input');
+const logoRemove   = document.getElementById('logo-remove');
+const logoPlaceholder = document.getElementById('logo-placeholder');
+
+let logoData = null; // base64 data URL
 const itemsCont    = document.getElementById('items-container');
 const subtotalEl   = document.getElementById('subtotal');
 const taxAmountEl  = document.getElementById('tax-amount');
@@ -34,8 +41,45 @@ const due = new Date(today);
 due.setDate(due.getDate() + 30);
 dueDate.value = due.toISOString().split('T')[0];
 
+// Logo helpers
+function setLogo(dataUrl) {
+  logoData = dataUrl;
+  logoPreview.src = dataUrl;
+  logoPreview.style.display = 'block';
+  logoPlaceholder.style.display = 'none';
+  logoRemove.style.display = 'block';
+  logoArea.classList.add('has-logo');
+}
+
+function clearLogo() {
+  logoData = null;
+  logoPreview.src = '';
+  logoPreview.style.display = 'none';
+  logoPlaceholder.style.display = 'block';
+  logoRemove.style.display = 'none';
+  logoArea.classList.remove('has-logo');
+}
+
+logoInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    setLogo(ev.target.result);
+    chrome.storage.local.set({ logo: ev.target.result });
+  };
+  reader.readAsDataURL(file);
+  logoInput.value = '';
+});
+
+logoRemove.addEventListener('click', (e) => {
+  e.stopPropagation();
+  clearLogo();
+  chrome.storage.local.remove('logo');
+});
+
 // Load saved business info, last invoice number, and currency
-chrome.storage.local.get(['fromName', 'fromEmail', 'fromAddress', 'lastInvoiceNum', 'currency'], (data) => {
+chrome.storage.local.get(['fromName', 'fromEmail', 'fromAddress', 'lastInvoiceNum', 'currency', 'logo'], (data) => {
   if (data.fromName)    fromName.value    = data.fromName;
   if (data.fromEmail)   fromEmail.value   = data.fromEmail;
   if (data.fromAddress) fromAddress.value = data.fromAddress;
@@ -44,6 +88,7 @@ chrome.storage.local.get(['fromName', 'fromEmail', 'fromAddress', 'lastInvoiceNu
     invoiceNum.value = `INV-${String(next).padStart(3, '0')}`;
   }
   if (data.currency) currencyEl.value = data.currency;
+  if (data.logo) setLogo(data.logo);
   updateRateHeader();
   recalculate();
 });
@@ -137,21 +182,48 @@ document.getElementById('generate-pdf').addEventListener('click', () => {
   const lgray   = [245, 246, 250];
 
   // Header bar
+  const headerH = 48;
   doc.setFillColor(...blue);
-  doc.rect(0, 0, pageW, 38, 'F');
-
+  doc.rect(0, 0, pageW, headerH, 'F');
   doc.setTextColor(255, 255, 255);
+
+  // Right side: INVOICE title + invoice details
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.text('INVOICE', margin, 22);
-
-  doc.setFontSize(10);
+  doc.setFontSize(20);
+  doc.text('INVOICE', pageW - margin, 15, { align: 'right' });
   doc.setFont('helvetica', 'normal');
-  doc.text(`#${invoiceNum.value}`, pageW - margin, 16, { align: 'right' });
-  doc.text(invoiceDate.value, pageW - margin, 23, { align: 'right' });
-  doc.text(`Due: ${dueDate.value}`, pageW - margin, 30, { align: 'right' });
+  doc.setFontSize(9);
+  doc.text(`#${invoiceNum.value}`, pageW - margin, 25, { align: 'right' });
+  doc.text(invoiceDate.value,      pageW - margin, 32, { align: 'right' });
+  doc.text(`Due: ${dueDate.value}`, pageW - margin, 39, { align: 'right' });
 
-  let y = 50;
+  // Left side: logo + business name
+  if (logoData) {
+    try {
+      const fmt = logoData.includes('image/png') ? 'PNG' : 'JPEG';
+      const props = doc.getImageProperties(logoData);
+      const maxW = 36, maxH = 34;
+      let imgW = maxW;
+      let imgH = (props.height * maxW) / props.width;
+      if (imgH > maxH) { imgH = maxH; imgW = (props.width * maxH) / props.height; }
+      doc.addImage(logoData, fmt, margin, (headerH - imgH) / 2, imgW, imgH);
+      if (fromName.value) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(fromName.value, margin + imgW + 4, headerH / 2 + 2);
+      }
+    } catch (_) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text(fromName.value || '', margin, headerH / 2 + 2);
+    }
+  } else if (fromName.value) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(fromName.value, margin, headerH / 2 + 2);
+  }
+
+  let y = headerH + 12;
 
   // From / To
   doc.setFont('helvetica', 'bold');
